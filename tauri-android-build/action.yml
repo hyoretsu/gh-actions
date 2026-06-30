@@ -1,0 +1,114 @@
+name: Build the Tauri Android app
+description: "Set up the full Tauri Android toolchain (Bun, JDK, Android SDK/NDK, Rust targets, deps, release keystore) and build the app in one step. Derives a monotonic versionCode from HEAD's committer timestamp and reads the app version from tauri.conf.json, then drives the Tauri CLI directly (tauri-action's mobile support is flaky). Builds APK + AAB by default; pass `--debug --apk` for an unsigned PR check. Outputs the version, versionCode and artifact globs for downstream GitHub releases and store uploads. The repo must already be checked out."
+
+inputs:
+  keystore-base64:
+    description: Base64-encoded PKCS#12 release keystore (.p12). Omit for an unsigned/debug build (e.g. PR checks).
+    required: false
+  keystore-password:
+    description: Password for the keystore and the signing key (shared).
+    required: false
+  key-alias:
+    description: Alias of the signing key inside the keystore.
+    required: false
+  project-path:
+    description: Frontend project path that holds the `bun tauri` script.
+    required: false
+    default: frontend
+  tauri-path:
+    description: Path to the Tauri crate (holds tauri.conf.json, gen/android and the Cargo target).
+    required: false
+    default: frontend/src-tauri
+  args:
+    description: Formats/flags passed to `bun tauri android build` (e.g. `--debug --apk` for PR checks).
+    required: false
+    default: --apk --aab
+
+outputs:
+  version:
+    description: App version read from tauri.conf.json (e.g. 1.0.0).
+    value: ${{ steps.version.outputs.version }}
+  version-code:
+    description: Monotonic Android versionCode derived from HEAD's committer epoch.
+    value: ${{ steps.vc.outputs.code }}
+  apk-glob:
+    description: Glob matching the built signed release APK(s).
+    value: ${{ inputs.tauri-path }}/gen/android/app/build/outputs/apk/**/*-release.apk
+  aab-glob:
+    description: Glob matching the built release AAB(s).
+    value: ${{ inputs.tauri-path }}/gen/android/app/build/outputs/bundle/**/*.aab
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "17"
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Setup Rust with Android targets
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: ${{ inputs.tauri-path }} -> target
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install
+
+    - name: Materialize signing keystore
+      # Skipped when no keystore is provided — the build then stays unsigned (PR checks).
+      if: ${{ inputs.keystore-base64 != '' }}
+      shell: bash
+      working-directory: ${{ inputs.tauri-path }}/gen/android
+      env:
+        KEYSTORE_BASE64: ${{ inputs.keystore-base64 }}
+        KEYSTORE_PASSWORD: ${{ inputs.keystore-password }}
+        KEY_ALIAS: ${{ inputs.key-alias }}
+      run: |
+        echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+        cat > keystore.properties <<EOF
+        password=$KEYSTORE_PASSWORD
+        keyAlias=$KEY_ALIAS
+        storeFile=$RUNNER_TEMP/release.p12
+        storeType=PKCS12
+        EOF
+
+    - name: Resolve NDK path
+      id: ndk
+      shell: bash
+      # The runner ships an NDK at ANDROID_NDK_LATEST_HOME; Tauri needs it via NDK_HOME.
+      run: echo "ndk-home=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_OUTPUT"
+
+    - name: Compute versionCode from commit timestamp
+      id: vc
+      shell: bash
+      # HEAD's committer epoch (minutes): deterministic per commit, monotonic on main,
+      # needs only HEAD (no full history) and stays well under Play's 2.1e9 ceiling.
+      run: echo "code=$(( $(git show -s --format=%ct HEAD) / 60 ))" >> "$GITHUB_OUTPUT"
+
+    - name: Read app version
+      id: version
+      shell: bash
+      run: echo "version=$(jq -r .version ${{ inputs.tauri-path }}/tauri.conf.json)" >> "$GITHUB_OUTPUT"
+
+    - name: Build Android app
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      env:
+        NDK_HOME: ${{ steps.ndk.outputs.ndk-home }}
+        # Unique, increasing versionCode so each store upload is accepted.
+        ANDROID_VERSION_CODE: ${{ steps.vc.outputs.code }}
+      # One invocation builds the requested formats and shares the compiled Rust libs.
+      run: bun tauri android build ${{ inputs.args }}

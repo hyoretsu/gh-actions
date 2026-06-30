@@ -10,34 +10,34 @@ All actions assume the consumer repo is **already checked out** before they run 
 
 | Action | Purpose | Key inputs |
 | --- | --- | --- |
-| [`android-build`](android-build/action.yml) | Build the signed Tauri Android APK + AAB once (store-agnostic). Outputs `version`, `version-code`, `apk-glob`, `aab-glob`. | `ndk-home` (required), `project-path` (default `frontend`), `tauri-path` (default `frontend/src-tauri`), `args` (default `--apk --aab`) |
 | [`build`](build/action.yml) | Build one workspace package (Turbo or `bun --filter`). | `package` (required) |
 | [`check-types`](check-types/action.yml) | Type-check one workspace package (Turbo or `bun --filter`). | `package` (required) |
 | [`detect-affected`](detect-affected/action.yml) | Resolve affected packages per task; emits JSON for a downstream matrix. Built-in Turbo-free resolver by default. Needs `fetch-depth: 0`. | `tasks` (required), `base-sha`, `script` (optional custom resolver) |
 | [`ghcr`](ghcr/action.yml) | Buildx + metadata + login + build/push a Docker image with gha cache. Defaults to GHCR. | `image` (required), `dockerfile` (required), `cache-scope` (required), `password` (required), `context`, `build-args`, `secrets`, `registry`, `username`, `push` |
 | [`migrate`](migrate/action.yml) | Apply pending Prisma migrations (`--force` unless `check`). | `database-url` (required), `check`, `package` (default `sql`), `task` (default `migrate:deploy`) |
-| [`play-deploy`](play-deploy/action.yml) | Upload a release AAB to Google Play on the chosen track. | `service-account-json` (required), `package-name` (required), `aab` (required), `track` (default `production`), `status` (default `completed`) |
-| [`setup-tauri-android`](setup-tauri-android/action.yml) | Prepare the Tauri Android toolchain + signing keystore. Outputs `ndk-home`. | `keystore-base64`, `keystore-password`, `key-alias`, `tauri-path` (default `frontend/src-tauri`) |
+| [`tauri-android-build`](tauri-android-build/action.yml) | Set up the Android toolchain + keystore and build the Tauri app (APK/AAB; pass `--debug --apk` for PR checks). Outputs `version`, `version-code`, `apk-glob`, `aab-glob`. | `keystore-base64`, `keystore-password`, `key-alias`, `project-path` (default `frontend`), `tauri-path` (default `frontend/src-tauri`), `args` (default `--apk --aab`) |
 | [`tauri-build`](tauri-build/action.yml) | Build + publish the Tauri desktop app to a GitHub release. | `github-token` (required), `project-path` (default `frontend`), `tag-name`, `release-name` |
 | [`test-e2e`](test-e2e/action.yml) | Run one package's E2E suite (Turbo `--force`, or `bun --filter`). | `package` (required), `database-url` (required) |
 | [`test-unit`](test-unit/action.yml) | Run one package's unit tests (Turbo or `bun --filter`). | `package` (required) |
 
 ## Mobile store deploys
 
-`android-build` compiles the signed artifacts **once** and exposes their paths; each store is then a thin `*-deploy` action consuming those outputs. Add a sibling action per store (Amazon Appstore, Samsung Galaxy Store, …) that takes the same `aab-glob`/`apk-glob` — the build never re-runs per store.
+`tauri-android-build` compiles the signed artifacts **once** and exposes their paths (`apk-glob`/`aab-glob`) plus `version`/`version-code`. Store uploads are thin steps in the workflow that consume those outputs — keep the upload action inline (it's a one-liner) and add one per store (Google Play, Amazon Appstore, Samsung Galaxy Store, …); the build never re-runs per store.
 
 ```yaml
-- uses: hyoretsu/gh-actions/setup-tauri-android@main
-  id: setup
-  with: { keystore-base64: "${{ secrets.ANDROID_KEYSTORE_BASE64 }}", keystore-password: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}", key-alias: "${{ secrets.ANDROID_KEY_ALIAS }}" }
-- uses: hyoretsu/gh-actions/android-build@main
+- uses: hyoretsu/gh-actions/tauri-android-build@main
   id: build
-  with: { ndk-home: "${{ steps.setup.outputs.ndk-home }}" }
-- uses: hyoretsu/gh-actions/play-deploy@main
   with:
-    service-account-json: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-    package-name: com.example.app
-    aab: ${{ steps.build.outputs.aab-glob }}
+    keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+    key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+- uses: r0adkll/upload-google-play@v1
+  with:
+    serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+    packageName: com.example.app
+    releaseFiles: ${{ steps.build.outputs.aab-glob }}
+    track: production
+    status: completed
 ```
 
 ## Usage
