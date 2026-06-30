@@ -1,22 +1,15 @@
 name: Detect affected packages
-description: >
-  Install deps and resolve, via Turbo's dependency graph, which workspace
-  packages are affected by the PR diff for the given task(s). Emits a JSON
-  object keyed by task (e.g. {"test:unit":["backend"]}) for a downstream matrix.
-  The repo must already be checked out (fetch-depth: 0) before this runs, since
-  it is a local action and Turbo's --affected needs the base commit present.
+description: "Install deps and resolve which workspace packages are affected by the PR diff for the given task(s). Emits a JSON object keyed by task (e.g. {\"test:unit\":[\"backend\"]}) for a downstream matrix; a task no package declares as a script yields an empty list, so its matrix job is skipped. By default uses a built-in, Turbo-free resolver (workspaces from package.json + git diff + per-package script presence); point `script` at a custom resolver to override. The repo must already be checked out (fetch-depth: 0) before this runs, since the base commit must be present to diff against."
 
 inputs:
   tasks:
-    description: Space-separated Turbo task names to evaluate (e.g. "test:unit test:e2e").
+    description: Space-separated task (script) names to evaluate (e.g. "test:unit test:e2e").
     required: true
   base-sha:
-    description: >
-      Base commit to diff against. Leave empty (or pass an all-zero SHA) to plan
-      every package — e.g. a push workflow_dispatch or a branch's first push.
+    description: Base commit to diff against. Leave empty (or pass an all-zero SHA) to plan every package — e.g. a push workflow_dispatch or a branch's first push.
     required: false
   script:
-    description: Path (in the consumer repo) to the affected-packages resolver run with Bun.
+    description: Optional path (in the consumer repo) to a custom affected-packages resolver run with Bun, invoked as `bun <script> <base-sha> <tasks...>`. When the file is absent the action falls back to a built-in, Turbo-free resolver that reads workspaces from package.json, diffs against base-sha, and keeps only packages that declare each task as a script.
     required: false
     default: scripts/affected-packages.ts
 
@@ -43,5 +36,9 @@ runs:
         TASKS: ${{ inputs.tasks }}
         SCRIPT: ${{ inputs.script }}
       run: |
-        tasks=$(bun "$SCRIPT" "$BASE_SHA" $TASKS)
+        if [ -n "$SCRIPT" ] && [ -f "$SCRIPT" ]; then
+          tasks=$(bun "$SCRIPT" "$BASE_SHA" $TASKS)
+        else
+          tasks=$(bun "$GITHUB_ACTION_PATH/affected.ts")
+        fi
         echo "tasks=$tasks" >> "$GITHUB_OUTPUT"

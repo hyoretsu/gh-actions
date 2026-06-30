@@ -1,5 +1,5 @@
 name: Build a package
-description: Install deps and build a single workspace package via Turbo.
+description: Install deps and build a single workspace package — via Turbo when turbo.json exists, otherwise `bun run --filter`.
 
 inputs:
   package:
@@ -26,8 +26,13 @@ runs:
 
     - name: Build ${{ inputs.package }}
       shell: bash
-      # generate/export (Turbo deps of build) read DATABASE_URL; a placeholder is
-      # enough since the build never connects to the database.
+      # generate/export (Turbo deps of build) read DATABASE_URL; a placeholder is enough since the build never connects to the database.
       env:
         DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
-      run: bun turbo run build -F ${{ inputs.package }}
+        PKG: ${{ inputs.package }}
+      run: |
+        if [ -f turbo.json ]; then
+          bun turbo run build -F "$PKG"
+        else
+          bun run --filter "$PKG" build
+        fi

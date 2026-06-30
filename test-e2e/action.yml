@@ -32,4 +32,10 @@ runs:
       env:
         DATABASE_URL: ${{ inputs.database-url }}
         DATABASE_TEST_URL: ${{ inputs.database-url }}
-      run: bun turbo run test:e2e -F ${{ inputs.package }} --force
+        PKG: ${{ inputs.package }}
+      run: |
+        if [ -f turbo.json ]; then
+          bun turbo run test:e2e -F "$PKG" --force
+        else
+          bun run --filter "$PKG" test:e2e
+        fi

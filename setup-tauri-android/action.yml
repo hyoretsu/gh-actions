@@ -1,10 +1,5 @@
 name: Setup the Tauri Android toolchain
-description: >
-  Prepare a runner to build the Tauri Android app: set up Bun, JDK, the Android
-  SDK/NDK, Rust with the Android targets, install workspace deps, and materialize
-  the release signing keystore from secrets (gradle reads keystore.properties).
-  Leaves the actual build to tauri-apps/tauri-action. The repo must already be
-  checked out before this runs.
+description: "Prepare a runner to build the Tauri Android app: set up Bun, JDK, the Android SDK/NDK, Rust with the Android targets, install workspace deps, and materialize the release signing keystore from secrets (gradle reads keystore.properties). Leaves the actual build to tauri-apps/tauri-action. The repo must already be checked out before this runs."
 
 inputs:
   keystore-base64:
