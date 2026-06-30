@@ -1,0 +1,58 @@
+name: Build the Tauri Android app
+description: "Build the signed Tauri Android artifacts (APK + AAB) once, store-agnostic. Derives a monotonic versionCode from HEAD's committer timestamp and reads the app version from tauri.conf.json, then drives the Tauri CLI directly (tauri-action's mobile support is flaky). Outputs the version, versionCode and artifact globs for downstream store-deploy actions (e.g. play-deploy) and GitHub releases. The toolchain must already be set up (see setup-tauri-android) and the repo checked out."
+
+inputs:
+  ndk-home:
+    description: NDK path to export as NDK_HOME (from setup-tauri-android's ndk-home output).
+    required: true
+  project-path:
+    description: Frontend project path that holds the `bun tauri` script.
+    required: false
+    default: frontend
+  tauri-path:
+    description: Path to the Tauri crate (holds tauri.conf.json and gen/android build outputs).
+    required: false
+    default: frontend/src-tauri
+  args:
+    description: Formats to build, passed to `bun tauri android build`.
+    required: false
+    default: --apk --aab
+
+outputs:
+  version:
+    description: App version read from tauri.conf.json (e.g. 1.0.0).
+    value: ${{ steps.version.outputs.version }}
+  version-code:
+    description: Monotonic Android versionCode derived from HEAD's committer epoch.
+    value: ${{ steps.vc.outputs.code }}
+  apk-glob:
+    description: Glob matching the built signed release APK(s).
+    value: ${{ inputs.tauri-path }}/gen/android/app/build/outputs/apk/**/*-release.apk
+  aab-glob:
+    description: Glob matching the built release AAB(s).
+    value: ${{ inputs.tauri-path }}/gen/android/app/build/outputs/bundle/**/*.aab
+
+runs:
+  using: composite
+  steps:
+    - name: Compute versionCode from commit timestamp
+      id: vc
+      shell: bash
+      # HEAD's committer epoch (minutes): deterministic per commit, monotonic on main,
+      # needs only HEAD (no full history) and stays well under Play's 2.1e9 ceiling.
+      run: echo "code=$(( $(git show -s --format=%ct HEAD) / 60 ))" >> "$GITHUB_OUTPUT"
+
+    - name: Read app version
+      id: version
+      shell: bash
+      run: echo "version=$(jq -r .version ${{ inputs.tauri-path }}/tauri.conf.json)" >> "$GITHUB_OUTPUT"
+
+    - name: Build Android APK + AAB
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      env:
+        NDK_HOME: ${{ inputs.ndk-home }}
+        # Unique, increasing versionCode so each store upload is accepted.
+        ANDROID_VERSION_CODE: ${{ steps.vc.outputs.code }}
+      # One invocation builds both formats and shares the compiled Rust libs.
+      run: bun tauri android build ${{ inputs.args }}
