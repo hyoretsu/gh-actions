@@ -22,7 +22,11 @@ inputs:
     description: Whether to push the built image.
     default: "true"
   registry:
-    description: Container registry to log in to and push to.
+    description: >
+      Container registry to log in to and push to. Possible values are:
+      - `ghcr.io` (GitHub Container Registry)
+    required: true
+    # Legacy default
     default: ghcr.io
   secrets:
     description: Newline-separated build secrets passed to the build (e.g. DATABASE_URL=...).
