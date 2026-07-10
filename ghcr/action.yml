@@ -11,7 +11,7 @@ inputs:
     default: .
   dockerfile:
     description: Path to the Dockerfile.
-    required: true
+    default: Dockerfile
   image:
     description: Fully-qualified image name without a tag (e.g. ghcr.io/owner/repo_backend).
     required: true
