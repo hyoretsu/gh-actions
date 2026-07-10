@@ -55,7 +55,8 @@ runs:
         images: ${{ inputs.image }}
         tags: |
           type=sha,prefix=sha-,format=short
-          type=raw,value={{date 'YYYYMMDD'}}
+          type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+          type=semver,pattern={{version}}
           type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
     - name: Log in to the registry
