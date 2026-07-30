@@ -16,7 +16,7 @@ inputs:
     default: ${{ github.repository }}
     description: Image name without tag or registry (e.g. owner/repo_backend).
   password:
-    description: Registry password or token (GHCR uses the workflow GITHUB_TOKEN).
+    description: Registry password or token (GHCR uses the `secrets.GITHUB_TOKEN`).
     required: true
   push:
     description: Whether to push the built image.
@@ -25,7 +25,6 @@ inputs:
     description: >
       Container registry to log in to and push to. Possible values are:
       - `ghcr.io` (GitHub Container Registry)
-    required: true
     # Legacy default
     default: ghcr.io
   secrets:
