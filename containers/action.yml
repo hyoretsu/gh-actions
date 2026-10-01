@@ -9,6 +9,9 @@ inputs:
   context:
     description: Build context.
     default: .
+  deploy-branch:
+    description: Branch that receives the latest image tag.
+    default: main
   dockerfile:
     description: Path to the Dockerfile.
     default: Dockerfile
@@ -52,7 +55,7 @@ runs:
       with:
         images: ${{ inputs.registry }}/${{ inputs.image }}
         tags: |
-          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+          type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', inputs.deploy-branch) }}
           type=sha,prefix=sha-,format=short
           type=raw,value={{date 'YYYYMMDD-HHmmss'}}
           type=raw,value={{date 'YYYYMMDD'}}
