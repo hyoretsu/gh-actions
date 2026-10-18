@@ -16,8 +16,10 @@ inputs:
     description: Path to the Dockerfile.
     default: Dockerfile
   image:
-    description: Image name without tag or registry (e.g. owner/repo_backend).
+    description: Image name without tag or registry (e.g. owner/repo).
     default: ${{ github.repository }}
+  image_suffix:
+    description: Suffix to add to image name, with an `_` separating them (e.g. owner/repo_backend).
   password:
     description: Registry password or token (GHCR uses the `secrets.GITHUB_TOKEN`).
     required: true
@@ -38,13 +40,19 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Resolve cache scope
-      id: cache-scope
+    - name: Resolve variables
+      id: resolve
       shell: bash
-      run: echo "value=${CACHE_SCOPE:-${IMAGE##*/}}" >> "$GITHUB_OUTPUT"
+      run: |
+        IMAGE="${IMAGE}${IMAGE_SUFFIX:+_${IMAGE_SUFFIX}}"
+
+        echo "cache-scope=${CACHE_SCOPE:-${IMAGE##*/}}" >> "$GITHUB_OUTPUT"
+        echo "image=${REGISTRY}/${IMAGE}" >> "$GITHUB_OUTPUT"
       env:
         CACHE_SCOPE: ${{ inputs.cache-scope }}
-        IMAGE: ${{ inputs.registry }}/${{ inputs.image }}
+        IMAGE: ${{ inputs.image }}
+        IMAGE_SUFFIX: ${{ inputs.image_suffix }}
+        REGISTRY: ${{ inputs.registry }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -53,7 +61,7 @@ runs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ inputs.registry }}/${{ inputs.image }}
+        images: ${{ steps.resolve.outputs.image }}
         tags: |
           type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', inputs.deploy-branch) }}
           type=sha,prefix=sha-,format=short
@@ -79,5 +87,5 @@ runs:
         labels: ${{ steps.meta.outputs.labels }}
         build-args: ${{ inputs.build-args }}
         secrets: ${{ inputs.secrets }}
-        cache-from: type=gha,scope=${{ steps.cache-scope.outputs.value }}
-        cache-to: type=gha,mode=max,scope=${{ steps.cache-scope.outputs.value }}
+        cache-from: type=gha,scope=${{ steps.resolve.outputs.cache-scope }}
+        cache-to: type=gha,mode=max,scope=${{ steps.resolve.outputs.cache-scope }}
