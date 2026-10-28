@@ -1,5 +1,5 @@
 name: Apply pending migrations
-description: Install deps and apply pending Prisma migrations. Runs via Turbo when turbo.json exists, otherwise `bun run --filter`. With Turbo, check mode caches the task result (safe verification against a disposable DB) while a real deploy is forced so it always runs against the target database.
+description: Install deps and apply pending Prisma migrations. Runs via Turbo when turbo.json or turbo.jsonc exists, otherwise `bun run --filter`. With Turbo, check mode caches the task result (safe verification against a disposable DB) while a real deploy is forced so it always runs against the target database.
 
 inputs:
   check:
@@ -36,7 +36,7 @@ runs:
         TASK: ${{ inputs.task }}
         FORCE: ${{ inputs.check == 'true' && '' || '--force' }}
       run: |
-        if [ -f turbo.json ]; then
+        if [ -f turbo.json ] || [ -f turbo.jsonc ]; then
           bun turbo -F "$PKG" "$TASK" $FORCE
         else
           bun run --filter "$PKG" "$TASK"

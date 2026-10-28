@@ -1,5 +1,5 @@
 name: Run unit tests for a package
-description: Install deps and run a single workspace package's unit tests — via Turbo when turbo.json exists, otherwise `bun run --filter`.
+description: Install deps and run a single workspace package's unit tests — via Turbo when turbo.json or turbo.jsonc exists, otherwise `bun run --filter`.
 
 inputs:
   package:
@@ -29,7 +29,7 @@ runs:
       env:
         PKG: ${{ inputs.package }}
       run: |
-        if [ -f turbo.json ]; then
+        if [ -f turbo.json ] || [ -f turbo.jsonc ]; then
           bun turbo run test:unit -F "$PKG"
         else
           bun run --filter "$PKG" test:unit

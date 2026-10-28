@@ -1,5 +1,5 @@
 name: Type-check a package
-description: Install deps and type-check a single workspace package — via Turbo when turbo.json exists, otherwise `bun run --filter`.
+description: Install deps and type-check a single workspace package — via Turbo when turbo.json or turbo.jsonc exists, otherwise `bun run --filter`.
 
 inputs:
   package:
@@ -31,7 +31,7 @@ runs:
         DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
         PKG: ${{ inputs.package }}
       run: |
-        if [ -f turbo.json ]; then
+        if [ -f turbo.json ] || [ -f turbo.jsonc ]; then
           bun turbo run check-types -F "$PKG"
         else
           bun run --filter "$PKG" check-types

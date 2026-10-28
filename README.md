@@ -4,7 +4,7 @@ Reusable composite GitHub Actions for the Bun monorepo stack. Each top-level dir
 
 All actions assume the consumer repo is **already checked out** before they run (they do not `actions/checkout` themselves), use **Bun** (`oven-sh/setup-bun@v2`), and run `bun install` internally.
 
-**Turbo is optional.** Per-package actions run via Turbo when a `turbo.json` exists at the repo root, otherwise they fall back to `bun run --filter <package> <task>`. Everything is also **skip-friendly**: `detect-affected` only emits packages that actually declare a task as a script, so a package missing a script — or a task no package declares — yields an empty matrix and the job is simply skipped. (`detect-affected` itself is the one always-run piece; without it there is nothing to drive the matrix.)
+**Turbo is optional.** Per-package actions run via Turbo when a `turbo.json` or `turbo.jsonc` exists at the repo root, otherwise they fall back to `bun run --filter <package> <task>`. Everything is also **skip-friendly**: `detect-affected` only emits packages that actually declare a task as a script, so a package missing a script — or a task no package declares — yields an empty matrix and the job is simply skipped. (`detect-affected` itself is the one always-run piece; without it there is nothing to drive the matrix.)
 
 ## Actions
 

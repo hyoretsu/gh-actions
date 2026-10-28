@@ -34,7 +34,7 @@ runs:
         DATABASE_TEST_URL: ${{ inputs.database-url }}
         PKG: ${{ inputs.package }}
       run: |
-        if [ -f turbo.json ]; then
+        if [ -f turbo.json ] || [ -f turbo.jsonc ]; then
           bun turbo run test:e2e -F "$PKG" --force
         else
           bun run --filter "$PKG" test:e2e
